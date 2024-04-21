@@ -70,7 +70,6 @@ def get_initial_pose_single(arm_name):
                        pose=Pose(position=Point(0.3, 0.0, 0.48),
                                  orientation=Quaternion(1.0, 0.0, 0.0, 0.0)))
 
-
 class SingleArmHandler(object):
 
     def __init__(self, robot_id='dual_hironx', arm_name='larm',
@@ -81,17 +80,17 @@ class SingleArmHandler(object):
         self.side = 'left' if arm_name == 'larm' else 'right'
         self.master_dev_name = master_dev_name
         # [1000Hz] * [m/mm] * [1.0 (scaler)]
-        self.vel_scale = 0.001 * 0.001 * vel_scale
+        self.vel_scale = vel_scale
         self.force_scale = force_scale
         self.send_rot = send_rot
         # initial rotation of the TouchUSB
         master_initial_q = R.from_quat([-0.5, -0.5, -0.5, 0.5])
-        # initial rotation of the Panda Arm
+        # initial rotation of the HIRONX Arm
         hironx_initial_q = R.from_quat([1.0, 0, 0, 0])
-        # conversion from TouchUSB to Panda
+        # conversion from TouchUSB to HIRONX
         self.q_m_p = hironx_initial_q * master_initial_q.inv()
         self.target_force = OmniFeedback()
-        self.zero_force = None  # for initializatoin
+        self.zero_force = None  # for initialization
         self.moving = False
         self.tf_listener = None
         self.current_frame_id = '{}_end_coords'.format(arm_name)
@@ -237,23 +236,24 @@ class DualArmHandler(object):
         return ControlBilateralResponse(True)
 
     def loop_call(self):
-        # send target pose for both arm if connected
-        if self.pose_connecting:
-            # self.rarm_target_pub.publish(self.rarm_handler.target_pose)
-            self.larm_target_pub.publish(self.larm_handler.target_pose)
-        else:
-            self.set_initial_pose()
+        pass
+        # # send target pose for both arm if connected
+        # if self.pose_connecting:
+        #     # self.rarm_target_pub.publish(self.rarm_handler.target_pose)
+        #     self.larm_target_pub.publish(self.larm_handler.target_pose)
+        # else:
+        #     self.set_initial_pose()
 
         # apply force feedback if connected
-        if self.force_connecting:
-            for arm in self.arms:
-                arm.apply_target_force()
+        # if self.force_connecting:
+        #     for arm in self.arms:
+        #         arm.apply_target_force()
 
     def run(self):
         rospy.loginfo("Start looping")
         r = rospy.Rate(50)
         while not rospy.is_shutdown():
-            self.loop_call()
+            # self.loop_call()
             r.sleep()
 
     def __del__(self):
