@@ -2,6 +2,8 @@
 
 (load "models/arrow-object.l")
 (load "package://hrpsys_ros_bridge_tutorials/euslisp/hironxjsk-interface.l")
+(load "package://jsk_hironx_teleop/euslisp/hiro-utils.l")
+
 ;; (ros::load-ros-manifest "omni_msgs")
 
 (ros::roseus-add-msgs "omni_msgs")
@@ -13,21 +15,15 @@
             :x (/ (aref fvec 0) 1000.0)
             :y (/ (aref fvec 1) 1000.0)
             :z (/ (aref fvec 2) 1000.0)))
-(defun solve-ik-larm (target-coords)
-  (send *hironxjsk* :larm :inverse-kinematics (send target-coords :copy-worldcoords) :rotation-axis t))
-(defun solve-ik-rarm (target-coords)
-  (send *hironxjsk* :rarm :inverse-kinematics (send target-coords :copy-worldcoords) :rotation-axis t))
-
-(hironxjsk-init)
 
 (defvar *tf-listener* nil)
 
 (defclass single-arm-handler
-  :slots (robot-id arm-name master-dev-name pos-scale force-scale send-rot side master-initial-q hironx-initial-q q-m-p *tf-listener* current-frame-id moving target-pose target-force device-target-pos zero-force force-topic force-pub-topic))
+  :slots (robot-id arm-name master-dev-name pos-scale force-scale send-rot side master-initial-q hironx-initial-q q-m-p *tf-listener* current-frame-id moving target-pose target-force device-target-pos zero-force force-topic force-pub-topic gripper-status))
 
 (defmethod single-arm-handler
   (:init
-   (&key ((:robot-id _robot-id) "dual_hironx") ((:arm-name _arm-name) "larm") ((:master-dev-name _master-dev-name) "left_device") ((:pos-scale _pos-scale) 1.0) ((:force-scale _force-scale) 0.1) ((:send-rot _send-rot) t) ((:side _side) "left"))
+   (&key ((:robot-id _robot-id) "dual_hironx") ((:arm-name _arm-name) "larm") ((:master-dev-name _master-dev-name) "left_device") ((:pos-scale _pos-scale) 1.0) ((:force-scale _force-scale) 0.1) ((:send-rot _send-rot) t) ((:side _side) "left") ((:gripper-status _gripper-status) nil))
    (send self :set-val 'robot-id _robot-id)
    (send self :set-val 'arm-name _arm-name)
    (send self :set-val 'master-dev-name _master-dev-name)
@@ -42,6 +38,7 @@
    (send self :set-val 'moving nil)
    (send self :set-val '*tf-listener* (instance ros::transform-listener :init))
    (send self :set-val 'force-pub-topic (format nil "/~A/phantom/force_feedback" (send self :get-val 'master-dev-name)))
+   (send self :set-val 'gripper-status _gripper-status)
    (send self :setup-ros))
 
   (:setup-ros ()
@@ -60,9 +57,25 @@
                          (progn
                            (setq moving nil)
                            (break)))
+                     ;; ;; gripper's status
+                     ;; (if (not (and (send self :get-val 'gripper-status) (send msg :close_gripper)))
+                     ;;     (progn
+                     ;;       (if (send self :get-val 'gripper-status)
+                     ;;           (progn
+                     ;;             (if (eq (send self :get-val 'arm-name) "larm")
+                     ;;                 (send *ri* :stop-grasp :larm)
+                     ;;               (send *ri* :stop-grasp :rarm))
+                     ;;             ;; (ir2ri-hand)
+                     ;;             (send self :set-val 'gripper-status nil))
+                     ;;         (progn
+                     ;;           (if (eq (send self :get-val 'arm-name) "larm")
+                     ;;               (send *ri* :start-grasp :larm)
+                     ;;             (send *ri* :start-grasp :rarm))
+                     ;;           ;; (ir2ri-hand)
+                     ;;           (send self :set-val 'gripper-status t)))))
                      ;; initial device-target-pos
                      (if (not (send self :get-val 'device-target-pos))
-                         (send self :set-val 'device-target-pos (send msg :pose :position)))
+                           (send self :set-val 'device-target-pos (send msg :pose :position)))
                      ;; update target-pose
                      (setq moving t)
                      (setf (elt (send (send self :get-val 'target-pose) :pos) 0)
@@ -73,6 +86,7 @@
                            (+ (elt (send (send self :get-val 'target-pose) :pos) 2) (* (- (send msg :pose :position :z) (send (send self :get-val 'device-target-pos) :z)) (send self :get-val 'pos-scale))))
                      (send self :set-val 'device-target-pos (send msg :pose :position))
                      (if send-rot
+                         (ros::ros-info "test")
                          (progn
                            (setq cur-q (quaternion2matrix (float-vector
                                                            (send msg :pose :orientation :w)
@@ -115,8 +129,7 @@
                           (setq base-to-target-transform (send (send base-to-joint0-link :copy-worldcoords) :transform (send (send self :get-val 'target-pose) :copy-worldcoords))))
 
   (:run ()
-        (ros::spin-once))
-  )
+        (ros::spin-once)))
 
 (defclass dual-arm-handler
   :slots (pos-scale-dual force-scale-dual larm-handler device-to-endcoords-transform))
@@ -135,30 +148,28 @@
    (send self :set-val 'larm-handler (instance single-arm-handler :init :arm-name "larm" :master-dev-name "left_device" :pos-scale (send self :get-val 'pos-scale-dual) :force-scale (send self :get-val 'force-scale-dual)))
    (send (send self :get-val 'larm-handler) :run)
    (send *left-target-arrow* :move-to (send (send (send self :get-val 'larm-handler) :transform-waist-based) :copy-worldcoords) :world)
-   (send self :set-val 'device-to-endcoords-transform (send (send *left-target-arrow* :copy-worldcoords) :transformation (send *left-end-coords* :copy-worldcoords)))
-)
+   (send self :set-val 'device-to-endcoords-transform (send (send *left-target-arrow* :copy-worldcoords) :transformation (send *left-end-coords* :copy-worldcoords))))
 
   (:loop-call ()
               (send (send self :get-val 'larm-handler) :run)
               (send *left-target-arrow* :move-to (send (send (send (send self :get-val 'larm-handler) :transform-waist-based) :copy-worldcoords) :transform (send (send self :get-val 'device-to-endcoords-transform) :copy-worldcoords)) :world)
               (solve-ik-larm (send *left-target-arrow* :copy-worldcoords))
-              ;; (send *ri* :angle-vector (send *hironxjsk* :angle-vector) 1000)
+              (send *ri* :angle-vector (send *hironxjsk* :angle-vector) 1000)
+              ;; (send *ri* :wait-interpolation)
               (send *irtviewer* :draw-objects)
               ;; force
-              (send (send self :get-val 'larm-handler) :apply-target-force)
-              (unix::sleep 1))
+              (send (send self :get-val 'larm-handler) :apply-target-force))
 
   (:run ()
    (ros::ros-info "Start looping")
-   (ros::rate 50)
+   (ros::rate 10)
    (while t
      (send self :loop-call)
-     (ros::sleep)))
-  )
+     (ros::sleep))))
 
 
 (defun main (&rest args)
-  (setq node (instance dual-arm-handler :init :force-scale-dual 1000.0))
+  (setq node (instance dual-arm-handler :init :pos-scale-dual 0.5 :force-scale-dual 100.0))
   (send node :run))
 
 (main)
