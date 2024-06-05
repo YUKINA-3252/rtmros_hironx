@@ -9,6 +9,11 @@ find_package(catkin REQUIRED COMPONENTS
   message_generation
 )
 
+add_message_files(
+  FILES
+  FloatVector.msg
+  )
+
 add_service_files(
   FILES
   ControlBilateral.srv
@@ -19,13 +24,15 @@ generate_messages(
   std_msgs
   )
 
-catkin_package(
-  CATKIN_DEPENDS
-  message_runtime
-  roscpp
-  rospy
-  std_msgs
-)
+# catkin_package(
+#   CATKIN_DEPENDS
+#   message_runtime
+#   roscpp
+#   rospy
+#   std_msgs
+# )
+
+catkin_package()
 
 include_directories(
   include
@@ -34,7 +41,7 @@ include_directories(
 
 catkin_generate_virtualenv(
   PYTHON_INTERPRETER python2
-  CHECK_VENV
+  CHECK_VENV FALSE
   )
 
 file(GLOB PYTHON_FILES python/*.py)
