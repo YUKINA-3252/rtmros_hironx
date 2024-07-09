@@ -26,8 +26,7 @@
   (send *ri* :wait-interpolation))
 (defun ir2ri-hand ()
     (send *ri* :hand-angle-vector :rhand (send *hironxjsk* :hand-angle-vector :rhand))
-    (send *ri* :hand-angle-vector :lhand (send *hironxjsk* :hand-angle-vector :lhand))
-    (send *ri* :wait-interpolation))
+    (send *ri* :hand-angle-vector :lhand (send *hironxjsk* :hand-angle-vector :lhand)))
 (defun ri2ir ()
   (send *hironxjsk* :angle-vector (send *ri* :state :potentio-vector)))
 
