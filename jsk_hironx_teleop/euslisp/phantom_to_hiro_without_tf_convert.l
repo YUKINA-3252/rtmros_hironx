@@ -274,7 +274,7 @@
 
 
 (defun main (&rest args)
-  (setq node (instance dual-arm-handler :init :pos-scale-dual 0.1 :force-scale-dual 50.0))
+  (setq node (instance dual-arm-handler :init :pos-scale-dual 1 :force-scale-dual 50.0))
   (send node :run))
 
 (main)
